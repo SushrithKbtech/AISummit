@@ -49,15 +49,15 @@ async def handle_message(
     if settings is None:
         raise HTTPException(status_code=500, detail="Server not initialized")
 
-    content_type = request.headers.get("content-type", "")
-    if "application/json" not in content_type.lower():
-        raise HTTPException(status_code=415, detail="Content-Type must be application/json")
-
     if not x_api_key or x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    if payload is None:
+    if payload is None or payload == {} or "sessionId" not in payload:
         return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" not in content_type.lower():
+        raise HTTPException(status_code=415, detail="Content-Type must be application/json")
 
     try:
         incoming = IncomingRequest.model_validate(payload)
