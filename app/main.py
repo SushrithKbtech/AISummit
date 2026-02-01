@@ -52,7 +52,17 @@ async def handle_message(
     if not x_api_key or x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    if payload is None or payload == {} or "sessionId" not in payload:
+    if payload is None or payload == {}:
+        return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+
+    message_block = payload.get("message") if isinstance(payload, dict) else None
+    message_text = ""
+    if isinstance(message_block, dict):
+        raw_text = message_block.get("text")
+        if isinstance(raw_text, str):
+            message_text = raw_text.strip()
+
+    if not message_text:
         return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
 
     content_type = request.headers.get("content-type", "")
@@ -62,7 +72,10 @@ async def handle_message(
     try:
         incoming = IncomingRequest.model_validate(payload)
     except Exception:
-        return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+        return JSONResponse(
+            status_code=200,
+            content=ReplyResponse(status="success", reply="Sorry, I don't understand. What is this about?").model_dump(),
+        )
 
     session_id = incoming.sessionId.strip()
     if not session_id:
