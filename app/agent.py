@@ -28,6 +28,9 @@ _PROBE_REPLIES = [
     "I got a warning, but it didn't say why.",
     "It says my account is blocked. What should I do?",
     "I'm worried this is a mistake. Can you explain?",
+    "Which department is calling me?",
+    "What's your employee ID and branch name?",
+    "Can you share the official verification link?",
 ]
 
 
@@ -47,11 +50,11 @@ def build_agent_reply(state: SessionState, scammer_text: str) -> AgentReply:
     lowered = (scammer_text or "").lower()
 
     if "otp" in lowered or "password" in lowered:
-        reply = "I don't share codes. Why do you need that?"
+        reply = "I don't share codes. Which department is this?"
     elif "upi" in lowered or "bank" in lowered or "account" in lowered or "payment" in lowered:
-        reply = "I don't see anything on my side. What is this for?"
+        reply = "I don't see anything on my side. What's your employee ID?"
     elif "link" in lowered or "click" in lowered or "http" in lowered:
-        reply = "I can't open links right now. What's it about?"
+        reply = "I can't open links right now. Can you share the official link?"
     elif "bot" in lowered:
         reply = "No, I'm just confused. Who is this?"
     else:
@@ -68,5 +71,8 @@ def build_agent_reply(state: SessionState, scammer_text: str) -> AgentReply:
     should_terminate = False
     if state.terminated:
         should_terminate = True
+
+    if reply == state.lastReply:
+        reply = _pick_reply(_PROBE_REPLIES, state)
 
     return AgentReply(reply=reply, agentNotes=agent_notes, shouldTerminate=should_terminate)

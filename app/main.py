@@ -72,9 +72,17 @@ async def handle_message(
     try:
         incoming = IncomingRequest.model_validate(payload)
     except Exception:
+        fallback_options = [
+            "Sorry, I don't understand. What is this about?",
+            "I'm not sure what you mean. Who is this?",
+            "I got your message but I'm confused. What's this about?",
+        ]
+        index = 0
+        if message_text:
+            index = abs(hash(message_text)) % len(fallback_options)
         return JSONResponse(
             status_code=200,
-            content=ReplyResponse(status="success", reply="Sorry, I don't understand. What is this about?").model_dump(),
+            content=ReplyResponse(status="success", reply=fallback_options[index]).model_dump(),
         )
 
     session_id = incoming.sessionId.strip()
