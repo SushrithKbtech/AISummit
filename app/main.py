@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
@@ -43,7 +43,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.post("/message")
 async def handle_message(
     request: Request,
-    payload: IncomingRequest,
+    payload: Optional[dict] = Body(default=None),
     x_api_key: Optional[str] = Header(default=None, alias="x-api-key"),
 ) -> JSONResponse:
     if settings is None:
@@ -56,7 +56,15 @@ async def handle_message(
     if not x_api_key or x_api_key != settings.api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    session_id = payload.sessionId.strip()
+    if payload is None:
+        return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+
+    try:
+        incoming = IncomingRequest.model_validate(payload)
+    except Exception:
+        return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+
+    session_id = incoming.sessionId.strip()
     if not session_id:
         raise HTTPException(status_code=400, detail="sessionId is required")
 
@@ -64,11 +72,11 @@ async def handle_message(
     if state is None:
         state = store.initialize(session_id)
     else:
-        if payload.conversationHistory is None or len(payload.conversationHistory) == 0:
+        if incoming.conversationHistory is None or len(incoming.conversationHistory) == 0:
             raise HTTPException(status_code=400, detail="conversationHistory required for follow-up messages")
 
-    incoming_text = payload.message.text or ""
-    is_scammer = payload.message.sender == "scammer"
+    incoming_text = incoming.message.text or ""
+    is_scammer = incoming.message.sender == "scammer"
 
     state.totalMessages += 1
 
@@ -106,7 +114,7 @@ async def handle_message(
     state.totalMessages += 1
 
     if state.scamConfirmed:
-        scammer_turns = len(payload.conversationHistory or []) + 1
+        scammer_turns = len(incoming.conversationHistory or []) + 1
         has_intel = bool(
             state.extractedIntelligence.bankAccounts
             or state.extractedIntelligence.upiIds
