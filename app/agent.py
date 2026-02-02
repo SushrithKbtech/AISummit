@@ -24,6 +24,14 @@ STRATEGIES = [
     "TECHNICAL_STALL_APP_ISSUE",
 ]
 
+_SLOT_STRATEGY = {
+    "upi": "UPI_COLLECT_REQUEST_CHECK",
+    "phone": "CALL_BACK_CONFIRM_NUMBER",
+    "phishing": "ASK_OFFICIAL_LINK_TICKET",
+    "bank": "ASK_EMPLOYEE_ID_BRANCH",
+    "suspicious": "ASK_OFFICIAL_LINK_TICKET",
+}
+
 _STRATEGY_TEMPLATES: Dict[str, List[str]] = {
     "ASK_EMPLOYEE_ID_BRANCH": [
         "Who is this exactly? Can you share your name and ID?",
@@ -71,6 +79,7 @@ _BANNED_PATTERNS = [
     "send otp",
     "cvv",
     "pin",
+    "passcode",
     "account number",
 ]
 
@@ -103,6 +112,10 @@ def _pick_from_templates(strategy: str, state: SessionState) -> str:
 
 
 def _pick_deterministic_strategy(state: SessionState) -> str:
+    for slot in state.missingSlots:
+        strategy = _SLOT_STRATEGY.get(slot)
+        if strategy:
+            return strategy
     index = state.totalMessagesExchanged % len(STRATEGIES)
     return STRATEGIES[index]
 
@@ -148,6 +161,7 @@ def _llm_select_strategy(
     system_prompt = (
         "Return JSON only. Select the safest next strategy from the enum. "
         "Never choose a strategy that asks for OTP or victim credentials. "
+        "Prefer strategies that help collect missing slots if possible. "
         "JSON schema: {\"strategy\": <enum>, \"reason\": <short>}"
     )
 
@@ -196,6 +210,7 @@ def _llm_generate_reply(
         "Never ask for OTP, passwords, or account numbers. "
         "Never accuse, threaten, or mention scam detection. "
         "Avoid repeating previous questions; vary wording each turn. "
+        "Ask for scammer-side details that help verify who they are. "
         f"{softener} Output JSON only: {{\"reply\": string}}. "
         f"{safety_note}"
     )
@@ -295,6 +310,9 @@ def build_agent_reply(
 
     if not _asks_for_details(reply):
         reply = _pick_from_templates("ASK_OFFICIAL_LINK_TICKET", state)
+
+    if _contains_banned(reply):
+        reply = "Sorry, I can't share codes. Can you send the official link or reference number?"
 
     agent_notes = f"Strategy: {strategy}. Scammer pressed for verification or payment; asked for official details."
 

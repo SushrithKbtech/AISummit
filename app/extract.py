@@ -51,6 +51,13 @@ def extract_intelligence(text: str) -> ExtractionResult:
     phishing_links: Set[str] = set(match.lower().rstrip(").,;!") for match in _URL_PATTERN.findall(normalized))
     phone_numbers: Set[str] = set(_normalize_phone(match) for match in _PHONE_PATTERN.findall(normalized))
 
+    # Avoid misclassifying phone numbers as bank accounts.
+    bank_accounts = {
+        account
+        for account in bank_accounts
+        if account not in phone_numbers and len(account) != 10
+    }
+
     lowered = normalized.lower()
     suspicious_keywords: Set[str] = set()
     for keyword in _SUSPICIOUS_KEYWORDS:
