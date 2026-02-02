@@ -45,7 +45,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    return JSONResponse(status_code=400, content=ErrorResponse(status="error", error="Invalid request payload").model_dump())
+    return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
 
 
 @app.post("/message")
