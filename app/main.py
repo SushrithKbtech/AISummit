@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -31,10 +32,19 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def empty_body_guard(request: Request, call_next):
+async def tester_body_guard(request: Request, call_next):
     if request.url.path == "/message" and request.method.upper() == "POST":
+        if settings is None:
+            return JSONResponse(status_code=500, content=ErrorResponse(status="error", error="Server not initialized").model_dump())
+        x_api_key = request.headers.get("x-api-key")
+        if not x_api_key or x_api_key != settings.api_key:
+            return JSONResponse(status_code=401, content=ErrorResponse(status="error", error="Invalid API key").model_dump())
         body = await request.body()
         if body is None or body.strip() == b"":
+            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+        try:
+            json.loads(body.decode("utf-8"))
+        except Exception:
             return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
     return await call_next(request)
 store = SessionStore()
