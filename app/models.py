@@ -10,7 +10,6 @@ Sender = Literal["scammer", "user"]
 
 class Message(BaseModel):
     model_config = ConfigDict(extra="ignore")
-
     sender: Sender
     text: str = Field(default="")
     timestamp: str
@@ -18,7 +17,6 @@ class Message(BaseModel):
 
 class Metadata(BaseModel):
     model_config = ConfigDict(extra="ignore")
-
     channel: Optional[str] = None
     language: Optional[str] = None
     locale: Optional[str] = None
@@ -26,7 +24,6 @@ class Metadata(BaseModel):
 
 class IncomingRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
-
     sessionId: str
     message: Message
     conversationHistory: Optional[List[Message]] = None
@@ -34,13 +31,15 @@ class IncomingRequest(BaseModel):
 
 
 class ReplyResponse(BaseModel):
+    # GUVI expects exactly these keys for /message success
     status: str
     reply: str
 
 
 class ErrorResponse(BaseModel):
+    # GUVI expects message (not error)
     status: str
-    error: str
+    message: str
 
 
 class Intelligence(BaseModel):
