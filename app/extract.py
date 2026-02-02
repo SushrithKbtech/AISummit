@@ -6,7 +6,7 @@ from typing import List, Set
 from .models import ExtractionResult
 
 
-_BANK_PATTERN = re.compile(r"\b\d{9,18}\b")
+_BANK_PATTERN = re.compile(r"\b(?:\d[ -]?){9,18}\b")
 _UPI_PATTERN = re.compile(r"\b[a-z0-9.\-_]{2,}@[a-z]{2,}\b", re.IGNORECASE)
 _URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 _PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s\-]{7,}\d)")
@@ -38,10 +38,15 @@ def _normalize_phone(value: str) -> str:
     return digits
 
 
+def _normalize_account(value: str) -> str:
+    digits = re.sub(r"\D", "", value)
+    return digits
+
+
 def extract_intelligence(text: str) -> ExtractionResult:
     normalized = text or ""
 
-    bank_accounts: Set[str] = set(_BANK_PATTERN.findall(normalized))
+    bank_accounts: Set[str] = set(_normalize_account(match) for match in _BANK_PATTERN.findall(normalized))
     upi_ids: Set[str] = set(match.lower() for match in _UPI_PATTERN.findall(normalized))
     phishing_links: Set[str] = set(match.lower().rstrip(").,;!") for match in _URL_PATTERN.findall(normalized))
     phone_numbers: Set[str] = set(_normalize_phone(match) for match in _PHONE_PATTERN.findall(normalized))

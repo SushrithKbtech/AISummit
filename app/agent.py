@@ -38,7 +38,7 @@ def _pick_reply(options: List[str], state: SessionState) -> str:
     if not options:
         return "Okay."
 
-    seed = f"{state.sessionId}:{state.totalMessages}"
+    seed = f"{state.sessionId}:{state.totalMessagesExchanged}"
     index = int(hashlib.sha256(seed.encode("utf-8")).hexdigest(), 16) % len(options)
     reply = options[index]
     if reply == state.lastReply:
@@ -48,15 +48,30 @@ def _pick_reply(options: List[str], state: SessionState) -> str:
 
 def build_agent_reply(state: SessionState, scammer_text: str) -> AgentReply:
     lowered = (scammer_text or "").lower()
+    slot_prompts = {
+        "upi": "If you sent a collect request, what's the UPI handle so I can verify?",
+        "phone": "Can you share the caller number and an alternate number?",
+        "phishing": "Please share the official verification link from your site.",
+        "bank": "Which bank account should I see the collect request from?",
+        "suspicious": "Do you have a reference or ticket number for this?",
+    }
+
+    next_slot = ""
+    for slot in state.missingSlots:
+        if slot in slot_prompts:
+            next_slot = slot
+            break
 
     if "otp" in lowered or "password" in lowered:
-        reply = "I don't share codes. Which department is this?"
+        reply = "I don't share codes. Which department is this, and what's your employee ID?"
     elif "upi" in lowered or "bank" in lowered or "account" in lowered or "payment" in lowered:
-        reply = "I don't see anything on my side. What's your employee ID?"
+        reply = "I don't see anything on my side. What's your employee ID and branch name?"
     elif "link" in lowered or "click" in lowered or "http" in lowered:
-        reply = "I can't open links right now. Can you share the official link?"
+        reply = "I can't open links right now. Can you share the official verification link?"
     elif "bot" in lowered:
         reply = "No, I'm just confused. Who is this?"
+    elif next_slot:
+        reply = slot_prompts[next_slot]
     else:
         bucket = [
             _pick_reply(_PROBE_REPLIES, state),
@@ -64,9 +79,9 @@ def build_agent_reply(state: SessionState, scammer_text: str) -> AgentReply:
             _pick_reply(_CONFUSED_REPLIES, state),
             _pick_reply(_STALL_REPLIES, state),
         ]
-        reply = bucket[state.totalMessages % len(bucket)]
+        reply = bucket[state.totalMessagesExchanged % len(bucket)]
 
-    agent_notes = "Scammer pressed for verification or payment; user remained cautious and asked for clarification."
+    agent_notes = "Scammer pressed for verification or payment; user asked for official details."
 
     should_terminate = False
     if state.terminated:

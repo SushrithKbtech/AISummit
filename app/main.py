@@ -99,7 +99,7 @@ async def handle_message(
     incoming_text = incoming.message.text or ""
     is_scammer = incoming.message.sender == "scammer"
 
-    state.totalMessages += 1
+    state.totalMessagesExchanged += 1
 
     if is_scammer:
         detector = detect_scam_intent(incoming_text)
@@ -111,6 +111,17 @@ async def handle_message(
         extraction = extract_intelligence(incoming_text)
         merged = merge_extraction(state.extractedIntelligence, extraction)
         state.extractedIntelligence = merged
+        state.missingSlots = []
+        if not state.extractedIntelligence.upiIds:
+            state.missingSlots.append("upi")
+        if not state.extractedIntelligence.phoneNumbers:
+            state.missingSlots.append("phone")
+        if not state.extractedIntelligence.phishingLinks:
+            state.missingSlots.append("phishing")
+        if not state.extractedIntelligence.bankAccounts:
+            state.missingSlots.append("bank")
+        if not state.extractedIntelligence.suspiciousKeywords:
+            state.missingSlots.append("suspicious")
 
         normalized = incoming_text.strip().lower()
         if state.lastScammerMessage and normalized == state.lastScammerMessage:
@@ -123,6 +134,7 @@ async def handle_message(
     if state.agentActive:
         agent_reply = build_agent_reply(state, incoming_text)
         reply_text = agent_reply.reply
+        state.agentNotes = agent_reply.agentNotes
     else:
         reply_text = "Sorry, who is this?"
 
@@ -132,7 +144,7 @@ async def handle_message(
             reply_text = "Sorry, I still don't understand."
 
     state.lastReply = reply_text
-    state.totalMessages += 1
+    state.totalMessagesExchanged += 1
 
     if state.scamConfirmed:
         scammer_turns = len(incoming.conversationHistory or []) + 1

@@ -66,13 +66,15 @@ class SessionState(BaseModel):
     scamScore: float = 0.0
     scamConfirmed: bool = False
     agentActive: bool = False
-    totalMessages: int = 0
+    totalMessagesExchanged: int = 0
     lastReply: Optional[str] = None
     turnsSinceChange: int = 0
     terminated: bool = False
     finalCallbackSent: bool = False
     extractedIntelligence: Intelligence
     lastScammerMessage: Optional[str] = None
+    agentNotes: str = ""
+    missingSlots: List[str] = []
 
 
 class ExtractionResult(BaseModel):

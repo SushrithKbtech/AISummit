@@ -16,9 +16,9 @@ def send_final_callback(state: SessionState, settings: Settings) -> bool:
     payload = FinalCallbackPayload(
         sessionId=state.sessionId,
         scamDetected=True,
-        totalMessagesExchanged=state.totalMessages,
+        totalMessagesExchanged=state.totalMessagesExchanged,
         extractedIntelligence=state.extractedIntelligence,
-        agentNotes=_build_agent_notes(state),
+        agentNotes=state.agentNotes or _build_agent_notes(state),
     )
 
     try:
