@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
 import requests
 
 from .config import Settings
 from .models import FinalCallbackPayload, SessionState
-
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +12,7 @@ logger = logging.getLogger(__name__)
 def send_final_callback(state: SessionState, settings: Settings) -> bool:
     payload = FinalCallbackPayload(
         sessionId=state.sessionId,
-        scamDetected=True,
+        scamDetected=bool(state.scamConfirmed),  # ✅ honest
         totalMessagesExchanged=state.totalMessagesExchanged,
         extractedIntelligence=state.extractedIntelligence,
         agentNotes=state.agentNotes or _build_agent_notes(state),
