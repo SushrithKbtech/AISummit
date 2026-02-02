@@ -11,8 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .agent import build_agent_reply
-from .callback import send_final_callback, load_settings, Settings  # ✅ FIXED import
-from .config import detect_scam_intent  # ✅ FIXED import (based on your pasted code)
+from .callback import send_final_callback
+from .config import Settings, load_settings
+from .config import detect_scam_intent
 from .extract import extract_intelligence, merge_extraction
 from .models import ErrorResponse, IncomingRequest, ReplyResponse
 from .store import SessionStore
