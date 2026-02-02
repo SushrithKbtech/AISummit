@@ -26,28 +26,28 @@ STRATEGIES = [
 
 _STRATEGY_TEMPLATES: Dict[str, List[str]] = {
     "ASK_EMPLOYEE_ID_BRANCH": [
-        "Which department are you calling from, and what's your employee ID?",
-        "Can you share your employee ID and branch name?",
+        "Who is this exactly? Can you share your name and ID?",
+        "Which team are you from? What's your name and ID?",
     ],
     "ASK_OFFICIAL_LINK_TICKET": [
-        "Do you have an official verification link or a ticket number?",
-        "Please share the official link or reference number for this case.",
+        "Do you have an official link or reference number?",
+        "Can you share a reference number for this?",
     ],
     "OTP_NOT_RECEIVED_RESEND": [
         "I haven't received any code. Where is it from exactly?",
-        "No OTP came through. Which department is this from?",
+        "No OTP came through. Who is this from?",
     ],
     "CALL_BACK_CONFIRM_NUMBER": [
-        "Can I call back via the official helpline? Share the number and extension.",
-        "Please share the official helpline and your extension.",
+        "Can I call back on the official helpline? What's the number?",
+        "What's the official helpline number? I want to call back.",
     ],
     "UPI_COLLECT_REQUEST_CHECK": [
-        "If you sent a collect request, what's the UPI handle so I can verify?",
-        "What's the UPI handle you're using so I can check on my app?",
+        "If there's a collect request, what's the UPI handle?",
+        "What's the UPI handle? I can check on my app.",
     ],
     "TECHNICAL_STALL_APP_ISSUE": [
-        "My banking app is acting up. Can you share your employee ID and ticket number?",
-        "I'm not at my phone right now. Can you share the official helpline and your extension?",
+        "My app is acting up. Can I check in a bit?",
+        "I'm not at my phone right now. Can you call back later?",
     ],
 }
 
@@ -140,14 +140,16 @@ def _llm_select_strategy(
     )
 
     client = OpenAI(api_key=api_key)
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=model,
-        input=[
+        messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(payload)},
         ],
+        temperature=0.2,
     )
-    data = _parse_json(getattr(response, "output_text", "") or "")
+    content = response.choices[0].message.content if response.choices else ""
+    data = _parse_json(content or "")
     if not isinstance(data, dict):
         return None
     strategy = data.get("strategy")
@@ -167,24 +169,26 @@ def _llm_generate_reply(
         return None
 
     system_prompt = (
-        "You are a cautious, confused Indian banking customer. "
-        "Reply in 1-2 short sentences. Ask for scammer-side details only: "
-        "employee ID, department, branch, official link, caller number, ticket. "
-        "Never ask for OTP, passwords, or victim account numbers. "
+        "You are a real person texting back, casual and slightly confused. "
+        "Reply in 1-2 short sentences. Ask for only one or two details at a time "
+        "(name/ID, department, official link, helpline number, reference/ticket). "
+        "Never ask for OTP, passwords, or account numbers. "
         "Never accuse or mention scam detection. Output JSON only: {\"reply\": string}. "
         f"{safety_note}"
     )
     user_prompt = json.dumps({"strategy": strategy, "scammerMessage": scammer_text})
 
     client = OpenAI(api_key=api_key)
-    response = client.responses.create(
+    response = client.chat.completions.create(
         model=model,
-        input=[
+        messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        temperature=0.6,
     )
-    data = _parse_json(getattr(response, "output_text", "") or "")
+    content = response.choices[0].message.content if response.choices else ""
+    data = _parse_json(content or "")
     if not isinstance(data, dict):
         return None
     reply = data.get("reply")

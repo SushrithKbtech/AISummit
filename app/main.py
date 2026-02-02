@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Body, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
@@ -20,6 +22,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Agentic Honeypot API", docs_url=None, redoc_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 store = SessionStore()
 settings: Optional[Settings] = None
 
@@ -72,33 +80,55 @@ async def handle_message(
     try:
         incoming = IncomingRequest.model_validate(payload)
     except Exception:
-        fallback_options = [
-            "Sorry, I don't understand. What is this about?",
-            "I'm not sure what you mean. Who is this?",
-            "I got your message but I'm confused. What's this about?",
-            "Which department is this, and can you share a reference number?",
-        ]
-        index = 0
-        session_id_raw = payload.get("sessionId") if isinstance(payload, dict) else None
-        if isinstance(session_id_raw, str) and session_id_raw.strip():
-            session_id_raw = session_id_raw.strip()
-            state = store.get(session_id_raw)
-            if state is None:
-                state = store.initialize(session_id_raw)
-            state.totalMessagesExchanged += 1
-            index = state.totalMessagesExchanged % len(fallback_options)
-            reply = fallback_options[index]
-            if reply == state.lastReply:
-                reply = fallback_options[(index + 1) % len(fallback_options)]
-            state.lastReply = reply
-            store.upsert(state)
-            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply=reply).model_dump())
-        if message_text:
-            index = abs(hash(message_text)) % len(fallback_options)
-        return JSONResponse(
-            status_code=200,
-            content=ReplyResponse(status="success", reply=fallback_options[index]).model_dump(),
-        )
+        incoming = None
+        if isinstance(payload, dict):
+            session_id_raw = payload.get("sessionId")
+            message_block = payload.get("message") if isinstance(payload.get("message"), dict) else None
+            sender = message_block.get("sender") if message_block else None
+            text = message_block.get("text") if message_block else None
+            if isinstance(session_id_raw, str) and isinstance(sender, str) and isinstance(text, str):
+                timestamp = message_block.get("timestamp") if message_block else None
+                if not isinstance(timestamp, str) or not timestamp.strip():
+                    timestamp = datetime.now(timezone.utc).isoformat()
+                sanitized = {
+                    "sessionId": session_id_raw,
+                    "message": {"sender": sender, "text": text, "timestamp": timestamp},
+                    "conversationHistory": payload.get("conversationHistory") if isinstance(payload.get("conversationHistory"), list) else [],
+                    "metadata": payload.get("metadata") if isinstance(payload.get("metadata"), dict) else None,
+                }
+                try:
+                    incoming = IncomingRequest.model_validate(sanitized)
+                except Exception:
+                    incoming = None
+
+        if incoming is None:
+            fallback_options = [
+                "I'm a bit confused. Which department is this and what's your employee ID?",
+                "Can you share the official helpline number and a reference ID?",
+                "I can't verify this right now. Do you have an official link or ticket number?",
+                "Please share your branch/department and a callback number.",
+            ]
+            index = 0
+            session_id_raw = payload.get("sessionId") if isinstance(payload, dict) else None
+            if isinstance(session_id_raw, str) and session_id_raw.strip():
+                session_id_raw = session_id_raw.strip()
+                state = store.get(session_id_raw)
+                if state is None:
+                    state = store.initialize(session_id_raw)
+                state.totalMessagesExchanged += 1
+                index = state.totalMessagesExchanged % len(fallback_options)
+                reply = fallback_options[index]
+                if reply == state.lastReply:
+                    reply = fallback_options[(index + 1) % len(fallback_options)]
+                state.lastReply = reply
+                store.upsert(state)
+                return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply=reply).model_dump())
+            if message_text:
+                index = abs(hash(message_text)) % len(fallback_options)
+            return JSONResponse(
+                status_code=200,
+                content=ReplyResponse(status="success", reply=fallback_options[index]).model_dump(),
+            )
 
     session_id = incoming.sessionId.strip()
     if not session_id:
@@ -118,8 +148,17 @@ async def handle_message(
 
     if is_scammer:
         detector = detect_scam_intent(incoming_text)
+        logger.info(
+            "scam_detector score=%s indicators=%s threshold=%s",
+            detector.score,
+            detector.indicators,
+            settings.scam_threshold,
+        )
         state.scamScore = max(state.scamScore, detector.score)
         if state.scamScore >= settings.scam_threshold:
+            state.scamConfirmed = True
+            state.agentActive = True
+        elif any(keyword in incoming_text.lower() for keyword in ["otp", "upi", "blocked", "verify", "kyc"]):
             state.scamConfirmed = True
             state.agentActive = True
 

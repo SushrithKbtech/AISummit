@@ -3,6 +3,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+try:
+    from dotenv import load_dotenv
+except Exception:  # pragma: no cover - optional dependency
+    load_dotenv = None
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -17,11 +22,14 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    if load_dotenv is not None:
+        load_dotenv()
+
     api_key = os.environ.get("HONEY_POT_API_KEY", "")
     if not api_key:
         raise RuntimeError("HONEY_POT_API_KEY is required")
 
-    scam_threshold = float(os.environ.get("SCAM_THRESHOLD", "0.6"))
+    scam_threshold = float(os.environ.get("SCAM_THRESHOLD", "0.5"))
     max_turns = int(os.environ.get("MAX_TURNS", "20"))
     callback_url = os.environ.get(
         "FINAL_CALLBACK_URL",
