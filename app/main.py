@@ -76,8 +76,23 @@ async def handle_message(
             "Sorry, I don't understand. What is this about?",
             "I'm not sure what you mean. Who is this?",
             "I got your message but I'm confused. What's this about?",
+            "Which department is this, and can you share a reference number?",
         ]
         index = 0
+        session_id_raw = payload.get("sessionId") if isinstance(payload, dict) else None
+        if isinstance(session_id_raw, str) and session_id_raw.strip():
+            session_id_raw = session_id_raw.strip()
+            state = store.get(session_id_raw)
+            if state is None:
+                state = store.initialize(session_id_raw)
+            state.totalMessagesExchanged += 1
+            index = state.totalMessagesExchanged % len(fallback_options)
+            reply = fallback_options[index]
+            if reply == state.lastReply:
+                reply = fallback_options[(index + 1) % len(fallback_options)]
+            state.lastReply = reply
+            store.upsert(state)
+            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply=reply).model_dump())
         if message_text:
             index = abs(hash(message_text)) % len(fallback_options)
         return JSONResponse(
