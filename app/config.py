@@ -12,6 +12,8 @@ class Settings:
     callback_url: str
     http_timeout_seconds: float
     persona_name: str
+    openai_api_key: str
+    openai_model: str
 
 
 def load_settings() -> Settings:
@@ -27,6 +29,8 @@ def load_settings() -> Settings:
     )
     http_timeout_seconds = float(os.environ.get("CALLBACK_TIMEOUT", os.environ.get("HTTP_TIMEOUT_SECONDS", "5")))
     persona_name = os.environ.get("PERSONA_NAME", "Sam")
+    openai_api_key = os.environ.get("OPENAI_API_KEY", "")
+    openai_model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
     return Settings(
         api_key=api_key,
@@ -35,4 +39,6 @@ def load_settings() -> Settings:
         callback_url=callback_url,
         http_timeout_seconds=http_timeout_seconds,
         persona_name=persona_name,
+        openai_api_key=openai_api_key,
+        openai_model=openai_model,
     )

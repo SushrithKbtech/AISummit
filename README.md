@@ -17,6 +17,8 @@ pip install -r requirements.txt
 - `FINAL_CALLBACK_URL` (default: https://hackathon.guvi.in/api/updateHoneyPotFinalResult)
 - `CALLBACK_TIMEOUT` (default: 5)
 - `PERSONA_NAME` (default: Sam)
+- `OPENAI_API_KEY` (optional, enables LLM replies)
+- `OPENAI_MODEL` (default: gpt-4o-mini)
 
 ## Run
 ```bash

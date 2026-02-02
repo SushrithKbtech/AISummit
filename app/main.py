@@ -147,7 +147,13 @@ async def handle_message(
 
     reply_text = ""
     if state.agentActive:
-        agent_reply = build_agent_reply(state, incoming_text)
+        agent_reply = build_agent_reply(
+            state,
+            incoming_text,
+            (incoming.conversationHistory or []) + [incoming.message],
+            settings.openai_api_key,
+            settings.openai_model,
+        )
         reply_text = agent_reply.reply
         state.agentNotes = agent_reply.agentNotes
     else:
