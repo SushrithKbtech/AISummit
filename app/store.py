@@ -34,6 +34,8 @@ class SessionStore:
                     suspiciousKeywords=[],
                 ),
                 missingSlots=["upi", "phone", "phishing", "bank", "suspicious"],
+                recentScammer=[],
+                recentHoneypot=[],
             )
             self._sessions[session_id] = state
             return state.model_copy(deep=True)
