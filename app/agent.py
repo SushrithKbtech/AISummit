@@ -28,26 +28,38 @@ _STRATEGY_TEMPLATES: Dict[str, List[str]] = {
     "ASK_EMPLOYEE_ID_BRANCH": [
         "Who is this exactly? Can you share your name and ID?",
         "Which team are you from? What's your name and ID?",
+        "Sorry, who is this? Please share your name and employee ID.",
+        "Which branch or team is this from? Just your name and ID is enough.",
     ],
     "ASK_OFFICIAL_LINK_TICKET": [
         "Do you have an official link or reference number?",
         "Can you share a reference number for this?",
+        "Is there any official link I can check? Or a ticket number?",
+        "Please send the case reference number or link.",
     ],
     "OTP_NOT_RECEIVED_RESEND": [
         "I haven't received any code. Where is it from exactly?",
         "No OTP came through. Who is this from?",
+        "I didn't get any code. Which department is sending it?",
+        "No code on my phone. What's the official source?",
     ],
     "CALL_BACK_CONFIRM_NUMBER": [
         "Can I call back on the official helpline? What's the number?",
         "What's the official helpline number? I want to call back.",
+        "I want to call the official helpline. What number should I use?",
+        "Can I verify on the helpline? Share the number please.",
     ],
     "UPI_COLLECT_REQUEST_CHECK": [
         "If there's a collect request, what's the UPI handle?",
         "What's the UPI handle? I can check on my app.",
+        "Which UPI handle is the request from?",
+        "Please share the UPI handle so I can verify.",
     ],
     "TECHNICAL_STALL_APP_ISSUE": [
         "My app is acting up. Can I check in a bit?",
         "I'm not at my phone right now. Can you call back later?",
+        "I'm in a meeting. Can you share details and call later?",
+        "My phone is restarting. Can you wait a few minutes?",
     ],
 }
 
@@ -183,6 +195,7 @@ def _llm_generate_reply(
         "(name/ID, department, official link, helpline number, reference/ticket). "
         "Never ask for OTP, passwords, or account numbers. "
         "Never accuse, threaten, or mention scam detection. "
+        "Avoid repeating previous questions; vary wording each turn. "
         f"{softener} Output JSON only: {{\"reply\": string}}. "
         f"{safety_note}"
     )
@@ -267,6 +280,10 @@ def build_agent_reply(
         reply = _pick_from_templates(strategy, state)
 
     if _normalize_text(reply) == _normalize_text(state.lastReply or ""):
+        alt_strategy = STRATEGIES[(STRATEGIES.index(strategy) + 1) % len(STRATEGIES)]
+        alt_reply = _llm_generate_reply(alt_strategy, scammer_text, api_key, model, early_turn=early_turn)
+        reply = alt_reply or _pick_from_templates(alt_strategy, state)
+    elif _normalize_text(reply) in {_normalize_text(t) for t in _STRATEGY_TEMPLATES.get(strategy, [])}:
         alt_strategy = STRATEGIES[(STRATEGIES.index(strategy) + 1) % len(STRATEGIES)]
         alt_reply = _llm_generate_reply(alt_strategy, scammer_text, api_key, model, early_turn=early_turn)
         reply = alt_reply or _pick_from_templates(alt_strategy, state)
