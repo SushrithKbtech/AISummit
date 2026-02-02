@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, List, Literal, Optional
-
+from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
-
 
 Sender = Literal["scammer", "user"]
 
@@ -31,13 +29,12 @@ class IncomingRequest(BaseModel):
 
 
 class ReplyResponse(BaseModel):
-    # GUVI expects exactly these keys for /message success
     status: str
     reply: str
 
 
 class ErrorResponse(BaseModel):
-    # GUVI expects message (not error)
+    # GUVI expects "message" (NOT "error")
     status: str
     message: str
 
@@ -74,6 +71,10 @@ class SessionState(BaseModel):
     lastScammerMessage: Optional[str] = None
     agentNotes: str = ""
     missingSlots: List[str] = []
+
+    # Rolling memory (works even when GUVI doesn’t send conversationHistory)
+    recentScammer: List[str] = []
+    recentHoneypot: List[str] = []
 
 
 class ExtractionResult(BaseModel):
