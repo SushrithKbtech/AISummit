@@ -51,6 +51,10 @@ async def root_get() -> JSONResponse:
 async def root_head() -> JSONResponse:
     return _safe_success("OK")
 
+@app.post("/")
+async def root_post() -> JSONResponse:
+    return _safe_success("OK")
+
 
 @app.get("/message")
 async def message_get() -> JSONResponse:
