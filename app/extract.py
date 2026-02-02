@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import re
-from typing import List, Set
+from typing import Set
 
 from .models import ExtractionResult
-
 
 _BANK_PATTERN = re.compile(r"\b(?:\d[ -]?){9,18}\b")
 _UPI_PATTERN = re.compile(r"\b[a-z0-9.\-_]{2,}@[a-z]{2,}\b", re.IGNORECASE)
@@ -34,35 +33,29 @@ _SUSPICIOUS_KEYWORDS = {
 
 
 def _normalize_phone(value: str) -> str:
-    digits = re.sub(r"\D", "", value)
-    return digits
+    return re.sub(r"\D", "", value)
 
 
 def _normalize_account(value: str) -> str:
-    digits = re.sub(r"\D", "", value)
-    return digits
+    return re.sub(r"\D", "", value)
 
 
 def extract_intelligence(text: str) -> ExtractionResult:
     normalized = text or ""
 
-    bank_accounts: Set[str] = set(_normalize_account(match) for match in _BANK_PATTERN.findall(normalized))
-    upi_ids: Set[str] = set(match.lower() for match in _UPI_PATTERN.findall(normalized))
-    phishing_links: Set[str] = set(match.lower().rstrip(").,;!") for match in _URL_PATTERN.findall(normalized))
-    phone_numbers: Set[str] = set(_normalize_phone(match) for match in _PHONE_PATTERN.findall(normalized))
+    bank_accounts: Set[str] = set(_normalize_account(m) for m in _BANK_PATTERN.findall(normalized))
+    upi_ids: Set[str] = set(m.lower() for m in _UPI_PATTERN.findall(normalized))
+    phishing_links: Set[str] = set(m.lower().rstrip(").,;!") for m in _URL_PATTERN.findall(normalized))
+    phone_numbers: Set[str] = set(_normalize_phone(m) for m in _PHONE_PATTERN.findall(normalized))
 
-    # Avoid misclassifying phone numbers as bank accounts.
-    bank_accounts = {
-        account
-        for account in bank_accounts
-        if account not in phone_numbers and len(account) != 10
-    }
+    # Avoid phone numbers being treated as bank accounts
+    bank_accounts = {a for a in bank_accounts if a not in phone_numbers and len(a) != 10}
 
     lowered = normalized.lower()
     suspicious_keywords: Set[str] = set()
-    for keyword in _SUSPICIOUS_KEYWORDS:
-        if keyword in lowered:
-            suspicious_keywords.add(keyword)
+    for k in _SUSPICIOUS_KEYWORDS:
+        if k in lowered:
+            suspicious_keywords.add(k)
 
     return ExtractionResult(
         bankAccounts=sorted(bank_accounts),
