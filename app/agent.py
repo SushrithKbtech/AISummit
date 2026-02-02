@@ -139,17 +139,20 @@ def _llm_select_strategy(
         "JSON schema: {\"strategy\": <enum>, \"reason\": <short>}"
     )
 
-    client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": json.dumps(payload)},
-        ],
-        temperature=0.2,
-    )
-    content = response.choices[0].message.content if response.choices else ""
-    data = _parse_json(content or "")
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": json.dumps(payload)},
+            ],
+            temperature=0.2,
+        )
+        content = response.choices[0].message.content if response.choices else ""
+        data = _parse_json(content or "")
+    except Exception:
+        return None
     if not isinstance(data, dict):
         return None
     strategy = data.get("strategy")
@@ -164,31 +167,41 @@ def _llm_generate_reply(
     api_key: str,
     model: str,
     safety_note: str = "",
+    early_turn: bool = False,
 ) -> Optional[str]:
     if OpenAI is None or not api_key:
         return None
 
+    softener = (
+        "Be extra polite and non-confrontational; start by asking what this is about."
+        if early_turn
+        else "Stay calm, slightly confused, and cautious."
+    )
     system_prompt = (
         "You are a real person texting back, casual and slightly confused. "
         "Reply in 1-2 short sentences. Ask for only one or two details at a time "
         "(name/ID, department, official link, helpline number, reference/ticket). "
         "Never ask for OTP, passwords, or account numbers. "
-        "Never accuse or mention scam detection. Output JSON only: {\"reply\": string}. "
+        "Never accuse, threaten, or mention scam detection. "
+        f"{softener} Output JSON only: {{\"reply\": string}}. "
         f"{safety_note}"
     )
     user_prompt = json.dumps({"strategy": strategy, "scammerMessage": scammer_text})
 
-    client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.6,
-    )
-    content = response.choices[0].message.content if response.choices else ""
-    data = _parse_json(content or "")
+    try:
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.6,
+        )
+        content = response.choices[0].message.content if response.choices else ""
+        data = _parse_json(content or "")
+    except Exception:
+        return None
     if not isinstance(data, dict):
         return None
     reply = data.get("reply")
@@ -231,7 +244,8 @@ def build_agent_reply(
     if not strategy:
         strategy = _pick_deterministic_strategy(state)
 
-    reply = _llm_generate_reply(strategy, scammer_text, api_key, model)
+    early_turn = state.totalMessagesExchanged <= 3
+    reply = _llm_generate_reply(strategy, scammer_text, api_key, model, early_turn=early_turn)
     if not reply:
         reply = _pick_from_templates(strategy, state)
 
@@ -244,6 +258,7 @@ def build_agent_reply(
             api_key,
             model,
             safety_note="Do not mention OTP, passwords, or account numbers.",
+            early_turn=early_turn,
         ) or _pick_from_templates(strategy, state)
 
     reply = _limit_sentences(reply, max_sentences=2)
@@ -253,7 +268,7 @@ def build_agent_reply(
 
     if _normalize_text(reply) == _normalize_text(state.lastReply or ""):
         alt_strategy = STRATEGIES[(STRATEGIES.index(strategy) + 1) % len(STRATEGIES)]
-        alt_reply = _llm_generate_reply(alt_strategy, scammer_text, api_key, model)
+        alt_reply = _llm_generate_reply(alt_strategy, scammer_text, api_key, model, early_turn=early_turn)
         reply = alt_reply or _pick_from_templates(alt_strategy, state)
 
     reply = _limit_sentences(reply, max_sentences=2)
