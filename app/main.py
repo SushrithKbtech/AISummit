@@ -43,8 +43,14 @@ async def tester_body_guard(request: Request, call_next):
         if body is None or body.strip() == b"":
             return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
         try:
-            json.loads(body.decode("utf-8"))
+            data = json.loads(body.decode("utf-8"))
         except Exception:
+            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+        if not isinstance(data, dict):
+            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+        message = data.get("message") if isinstance(data.get("message"), dict) else None
+        msg_text = message.get("text") if message else None
+        if not isinstance(msg_text, str) or not msg_text.strip():
             return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
     return await call_next(request)
 store = SessionStore()
