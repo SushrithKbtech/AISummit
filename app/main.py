@@ -28,6 +28,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def empty_body_guard(request: Request, call_next):
+    if request.url.path == "/message" and request.method.upper() == "POST":
+        body = await request.body()
+        if body is None or body.strip() == b"":
+            return JSONResponse(status_code=200, content=ReplyResponse(status="success", reply="Hello").model_dump())
+    return await call_next(request)
 store = SessionStore()
 settings: Optional[Settings] = None
 
