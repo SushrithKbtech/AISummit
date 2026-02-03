@@ -127,7 +127,7 @@ def _llm_select_strategy(
     model: str,
 ) -> Optional[str]:
     if OpenAI is None or not api_key:
-        return None
+        raise RuntimeError("LLM required but not available")
 
     scammer_msgs, user_msgs = _extract_last_messages(history)
     missing = {
@@ -166,16 +166,16 @@ def _llm_select_strategy(
         )
         content = response.choices[0].message.content if response.choices else ""
         data = _parse_json(content or "")
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError("LLM strategy selection failed") from exc
 
     if not isinstance(data, dict):
-        return None
+        raise RuntimeError("LLM strategy selection returned invalid JSON")
 
     strategy = data.get("strategy")
     if strategy in STRATEGIES:
         return strategy
-    return None
+    raise RuntimeError("LLM strategy selection returned invalid strategy")
 
 
 def _llm_generate_reply(
@@ -191,7 +191,7 @@ def _llm_generate_reply(
     stress_score_high: bool = False,
 ) -> Optional[str]:
     if OpenAI is None or not api_key:
-        return None
+        raise RuntimeError("LLM required but not available")
 
     recent_scammer = (recent_scammer or [])[-3:]
     recent_honeypot = (recent_honeypot or [])[-3:]
@@ -239,10 +239,13 @@ def _llm_generate_reply(
             temperature=0.6,
         )
         content = response.choices[0].message.content if response.choices else ""
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError("LLM reply generation failed") from exc
 
-    return content.strip() or None
+    reply_text = content.strip()
+    if not reply_text:
+        raise RuntimeError("LLM reply generation returned empty text")
+    return reply_text
 
 
 def _contains_banned(text: str) -> bool:
@@ -281,8 +284,6 @@ def build_agent_reply(
     model: str,
 ) -> AgentReply:
     strategy = _llm_select_strategy(state, scammer_text, history, api_key, model)
-    if not strategy:
-        strategy = _pick_deterministic_strategy(state, scammer_text)
 
     early_turn = state.totalMessagesExchanged <= 3
     next_intent = _STRATEGY_INTENT.get(strategy, "clarify_procedure")
@@ -302,8 +303,6 @@ def build_agent_reply(
         next_intent=next_intent,
         stress_score_high=stress_score_high,
     )
-    if not reply:
-        reply = "Sorry, I'm a bit confused. Can you share an official link or reference number?"
 
     reply = _limit_sentences(reply, max_sentences=2)
 
@@ -319,7 +318,7 @@ def build_agent_reply(
             early_turn=early_turn,
             next_intent=next_intent,
             stress_score_high=stress_score_high,
-        ) or "Sorry, I can't share any codes. Can you send the official link or reference number?"
+        )
 
     reply = _limit_sentences(reply, max_sentences=2)
 
@@ -336,7 +335,7 @@ def build_agent_reply(
             next_intent=_STRATEGY_INTENT.get(alt_strategy, "clarify_procedure"),
             stress_score_high=stress_score_high,
         )
-        reply = alt_reply or reply
+        reply = alt_reply
 
     reply = _limit_sentences(reply, max_sentences=2)
 
@@ -352,10 +351,10 @@ def build_agent_reply(
             early_turn=early_turn,
             next_intent="clarify_procedure",
             stress_score_high=stress_score_high,
-        ) or reply
+        )
 
     if _asks_for_secret(reply) or _contains_banned(reply):
-        reply = "Sorry, I can't share any codes. Can you send the official link or reference number?"
+        raise RuntimeError("LLM reply violated safety constraints")
 
     agent_notes = (
         f"Strategy: {strategy}. "
